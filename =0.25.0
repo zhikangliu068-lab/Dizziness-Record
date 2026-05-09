@@ -1,0 +1,43 @@
+Collecting flet
+  Obtaining dependency information for flet from https://files.pythonhosted.org/packages/2f/d0/9ba4ee34972e9e0cf54b1f7d17c695491632421f81301993f2aec8d12105/flet-0.28.3-py3-none-any.whl.metadata
+  Downloading flet-0.28.3-py3-none-any.whl.metadata (3.6 kB)
+Collecting httpx (from flet)
+  Obtaining dependency information for httpx from https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl.metadata
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting oauthlib<4.0.0,>=3.2.2 (from flet)
+  Obtaining dependency information for oauthlib<4.0.0,>=3.2.2 from https://files.pythonhosted.org/packages/be/9c/92789c596b8df838baa98fa71844d84283302f7604ed565dafe5a6b5041a/oauthlib-3.3.1-py3-none-any.whl.metadata
+  Downloading oauthlib-3.3.1-py3-none-any.whl.metadata (7.9 kB)
+Collecting repath<0.10.0,>=0.9.0 (from flet)
+  Obtaining dependency information for repath<0.10.0,>=0.9.0 from https://files.pythonhosted.org/packages/87/ed/92e9b8a3ffc562f21df14ef2538f54e911df29730e1f0d79130a4edc86e7/repath-0.9.0-py3-none-any.whl.metadata
+  Downloading repath-0.9.0-py3-none-any.whl.metadata (899 bytes)
+Requirement already satisfied: six>=1.9.0 in e:\files\广州实验室\00 项目\14 数字细胞\code\pythonproject2\.venv\lib\site-packages (from repath<0.10.0,>=0.9.0->flet) (1.17.0)
+Collecting anyio (from httpx->flet)
+  Obtaining dependency information for anyio from https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl.metadata
+  Downloading anyio-4.12.1-py3-none-any.whl.metadata (4.3 kB)
+Requirement already satisfied: certifi in e:\files\广州实验室\00 项目\14 数字细胞\code\pythonproject2\.venv\lib\site-packages (from httpx->flet) (2026.4.22)
+Collecting httpcore==1.* (from httpx->flet)
+  Obtaining dependency information for httpcore==1.* from https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl.metadata
+  Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Requirement already satisfied: idna in e:\files\广州实验室\00 项目\14 数字细胞\code\pythonproject2\.venv\lib\site-packages (from httpx->flet) (3.13)
+Collecting h11>=0.16 (from httpcore==1.*->httpx->flet)
+  Obtaining dependency information for h11>=0.16 from https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl.metadata
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting exceptiongroup>=1.0.2 (from anyio->httpx->flet)
+  Obtaining dependency information for exceptiongroup>=1.0.2 from https://files.pythonhosted.org/packages/8a/0e/97c33bf5009bdbac74fd2beace167cab3f978feb69cc36f1ef79360d6c4e/exceptiongroup-1.3.1-py3-none-any.whl.metadata
+  Downloading exceptiongroup-1.3.1-py3-none-any.whl.metadata (6.7 kB)
+Requirement already satisfied: typing_extensions>=4.5 in e:\files\广州实验室\00 项目\14 数字细胞\code\pythonproject2\.venv\lib\site-packages (from anyio->httpx->flet) (4.15.0)
+Downloading flet-0.28.3-py3-none-any.whl (463 kB)
+   ---------------------------------------- 463.0/463.0 kB 1.2 MB/s eta 0:00:00
+Downloading oauthlib-3.3.1-py3-none-any.whl (160 kB)
+   ---------------------------------------- 160.1/160.1 kB ? eta 0:00:00
+Downloading repath-0.9.0-py3-none-any.whl (4.7 kB)
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+   ---------------------------------------- 73.5/73.5 kB 2.0 MB/s eta 0:00:00
+Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+   ---------------------------------------- 78.8/78.8 kB ? eta 0:00:00
+Downloading anyio-4.12.1-py3-none-any.whl (113 kB)
+   ---------------------------------------- 113.6/113.6 kB ? eta 0:00:00
+Downloading exceptiongroup-1.3.1-py3-none-any.whl (16 kB)
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Installing collected packages: repath, oauthlib, h11, exceptiongroup, httpcore, anyio, httpx, flet
+Successfully installed anyio-4.12.1 exceptiongroup-1.3.1 flet-0.28.3 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 oauthlib-3.3.1 repath-0.9.0
