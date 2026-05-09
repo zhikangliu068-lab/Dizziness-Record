@@ -1,5 +1,5 @@
-name: Build APK
-on:
+  name: Build APK
+  on:
     push:
       branches: [main]
     workflow_dispatch:
@@ -24,3 +24,4 @@ on:
           with:
             name: dizziness-apk
             path: build/apk/*.apk
+
