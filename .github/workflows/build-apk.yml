@@ -1,9 +1,14 @@
+
   name: Build APK
 
   on:
     push:
       branches: [main, master]
     workflow_dispatch:
+
+  env:
+    FLET_CLI_NO_RICH_OUTPUT: 1
+    PYTHONUTF8: 1
 
   jobs:
     build:
@@ -38,6 +43,7 @@
               --project "DizzinessRecord" \
               --product "头晕记录" \
               --no-rich-output \
+              --yes \
               -v
 
         - name: Upload APK
