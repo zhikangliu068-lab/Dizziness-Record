@@ -14,7 +14,7 @@ ACTION_OPTIONS = ["扭头", "低头", "蹲起", "站立", "躺下", "起床", "�
 def main(page: ft.Page):
     page.title = "头晕记录"
     page.theme_mode = ft.ThemeMode.LIGHT
-    page.padding = 0
+    page.padding = ft.padding.only(top=40, left=16, right=16, bottom=16)
 
     init_db()
 
@@ -204,28 +204,17 @@ def main(page: ft.Page):
         refresh_recent()
 
         content.controls = [
-            ft.SafeArea(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Container(
-                            content=ft.Column([
-                                timer_t,
-                                status,
-                                ft.Row([b_start, b_stop], alignment=ft.MainAxisAlignment.CENTER),
-                                form,
-                            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
-                            alignment=ft.alignment.center,
-                            padding=ft.padding.only(top=20, bottom=10),
-                        ),
-                        ft.Divider(),
-                        ft.Text("最近记录", weight=ft.FontWeight.BOLD, size=18),
-                        ft.Container(content=recent, expand=True),
-                    ], expand=True, scroll=ft.ScrollMode.AUTO),
-                    padding=16,
-                    expand=True,
-                ),
-                expand=True,
-            )
+            ft.Column([
+                ft.Column([
+                    timer_t,
+                    status,
+                    ft.Row([b_start, b_stop], alignment=ft.MainAxisAlignment.CENTER),
+                    form,
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
+                ft.Divider(),
+                ft.Text("最近记录", weight=ft.FontWeight.BOLD, size=18),
+                recent,
+            ], expand=True, scroll=ft.ScrollMode.AUTO),
         ]
         page.update()
 
@@ -379,41 +368,34 @@ def main(page: ft.Page):
         analyze_btn = ft.ElevatedButton("分析", icon=ft.Icons.ANALYTICS, on_click=analyze)
 
         content.controls = [
-            ft.SafeArea(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Row([
-                            view_dd,
-                            ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: dp.pick_date()),
-                            date_lbl,
-                            analyze_btn,
-                        ], wrap=True, alignment=ft.MainAxisAlignment.CENTER),
-                        ft.Divider(),
-                        ft.Row([
-                            ft.Card(content=ft.Container(
-                                content=ft.Column([ft.Text("发作次数"), c_txt], alignment=ft.CrossAxisAlignment.CENTER),
-                                padding=16,
-                            )),
-                            ft.Card(content=ft.Container(
-                                content=ft.Column([ft.Text("总时长"), t_txt], alignment=ft.CrossAxisAlignment.CENTER),
-                                padding=16,
-                            )),
-                            ft.Card(content=ft.Container(
-                                content=ft.Column([ft.Text("平均时长"), a_txt], alignment=ft.CrossAxisAlignment.CENTER),
-                                padding=16,
-                            )),
-                        ], alignment=ft.MainAxisAlignment.SPACE_EVENLY),
-                        ft.Divider(),
-                        chart_box,
-                        ft.Divider(),
-                        ft.Text("详细数据", weight=ft.FontWeight.BOLD),
-                        tbl_box,
-                    ], scroll=ft.ScrollMode.AUTO),
-                    padding=16,
-                    expand=True,
-                ),
-                expand=True,
-            )
+            ft.Column([
+                ft.Row([
+                    view_dd,
+                    ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: dp.pick_date()),
+                    date_lbl,
+                    analyze_btn,
+                ], wrap=True, alignment=ft.MainAxisAlignment.CENTER),
+                ft.Divider(),
+                ft.Row([
+                    ft.Card(content=ft.Container(
+                        content=ft.Column([ft.Text("发作次数"), c_txt], alignment=ft.CrossAxisAlignment.CENTER),
+                        padding=16,
+                    )),
+                    ft.Card(content=ft.Container(
+                        content=ft.Column([ft.Text("总时长"), t_txt], alignment=ft.CrossAxisAlignment.CENTER),
+                        padding=16,
+                    )),
+                    ft.Card(content=ft.Container(
+                        content=ft.Column([ft.Text("平均时长"), a_txt], alignment=ft.CrossAxisAlignment.CENTER),
+                        padding=16,
+                    )),
+                ], alignment=ft.MainAxisAlignment.SPACE_EVENLY),
+                ft.Divider(),
+                chart_box,
+                ft.Divider(),
+                ft.Text("详细数据", weight=ft.FontWeight.BOLD),
+                tbl_box,
+            ], scroll=ft.ScrollMode.AUTO, expand=True),
         ]
         analyze(None)
         page.update()
@@ -529,17 +511,10 @@ def main(page: ft.Page):
 
         refresh()
         content.controls = [
-            ft.SafeArea(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Text("历史记录", weight=ft.FontWeight.BOLD, size=20),
-                        list_col,
-                    ], expand=True),
-                    padding=16,
-                    expand=True,
-                ),
-                expand=True,
-            )
+            ft.Column([
+                ft.Text("历史记录", weight=ft.FontWeight.BOLD, size=20),
+                list_col,
+            ], expand=True),
         ]
         page.update()
 
@@ -592,41 +567,34 @@ def main(page: ft.Page):
             page.update()
 
         content.controls = [
-            ft.SafeArea(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Text("手动新增", weight=ft.FontWeight.BOLD, size=20),
-                        ft.Text("开始时间", weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: s_d.pick_date()),
-                            s_d_l,
-                        ]),
-                        ft.Row([
-                            ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: s_t.pick_time()),
-                            s_t_l,
-                        ]),
-                        ft.Text("结束时间", weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: e_d.pick_date()),
-                            e_d_l,
-                        ]),
-                        ft.Row([
-                            ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: e_t.pick_time()),
-                            e_t_l,
-                        ]),
-                        loc,
-                        acts,
-                        note,
-                        ft.ElevatedButton(
-                            "保存", icon=ft.Icons.SAVE, on_click=save,
-                            bgcolor=ft.Colors.BLUE, color=ft.Colors.WHITE, width=200,
-                        ),
-                    ], scroll=ft.ScrollMode.AUTO),
-                    padding=16,
-                    expand=True,
+            ft.Column([
+                ft.Text("手动新增", weight=ft.FontWeight.BOLD, size=20),
+                ft.Text("开始时间", weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: s_d.pick_date()),
+                    s_d_l,
+                ]),
+                ft.Row([
+                    ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: s_t.pick_time()),
+                    s_t_l,
+                ]),
+                ft.Text("结束时间", weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: e_d.pick_date()),
+                    e_d_l,
+                ]),
+                ft.Row([
+                    ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: e_t.pick_time()),
+                    e_t_l,
+                ]),
+                loc,
+                acts,
+                note,
+                ft.ElevatedButton(
+                    "保存", icon=ft.Icons.SAVE, on_click=save,
+                    bgcolor=ft.Colors.BLUE, color=ft.Colors.WHITE, width=200,
                 ),
-                expand=True,
-            )
+            ], scroll=ft.ScrollMode.AUTO, expand=True),
         ]
         page.update()
 
