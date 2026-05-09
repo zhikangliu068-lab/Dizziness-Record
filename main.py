@@ -100,14 +100,12 @@ def main(page: ft.Page):
 
         def tick():
             while recording:
-                def update_timer():
-                    if recording and start_time:
-                        s = int((datetime.now() - start_time).total_seconds())
-                        h, r = divmod(s, 3600)
-                        m, s = divmod(r, 60)
-                        timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
-                        page.update()
-                page.run(update_timer)
+                if recording and start_time:
+                    s = int((datetime.now() - start_time).total_seconds())
+                    h, r = divmod(s, 3600)
+                    m, s = divmod(r, 60)
+                    timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
+                    page.update()
                 time.sleep(1)
 
         def on_start(_):
