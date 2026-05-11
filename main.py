@@ -619,8 +619,8 @@ def main(page: ft.Page):
         page.update()
 
     # 初始显示记录页面
-    build_record()
     page.add(content)
+    build_record()
 
 
 ft.app(target=main)
