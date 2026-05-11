@@ -14,7 +14,7 @@ ACTION_OPTIONS = ["扭头", "低头", "蹲起", "站立", "躺下", "起床", "�
 def main(page: ft.Page):
     page.title = "头晕记录"
     page.theme_mode = ft.ThemeMode.LIGHT
-    page.padding = 0
+    page.padding = ft.padding.only(top=40, left=16, right=16, bottom=16)
 
     init_db()
 
@@ -100,14 +100,12 @@ def main(page: ft.Page):
 
         def tick():
             while recording:
-                def update_timer():
-                    if recording and start_time:
-                        s = int((datetime.now() - start_time).total_seconds())
-                        h, r = divmod(s, 3600)
-                        m, s = divmod(r, 60)
-                        timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
-                        page.update()
-                page.run(update_timer)
+                if recording and start_time:
+                    s = int((datetime.now() - start_time).total_seconds())
+                    h, r = divmod(s, 3600)
+                    m, s = divmod(r, 60)
+                    timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
+                    page.update()
                 time.sleep(1)
 
         def on_start(_):
@@ -214,13 +212,12 @@ def main(page: ft.Page):
                             form,
                         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
                         alignment=ft.alignment.center,
-                        padding=ft.padding.only(top=20, bottom=10),
+                        padding=ft.padding.only(top=10, bottom=10),
                     ),
                     ft.Divider(),
                     ft.Text("最近记录", weight=ft.FontWeight.BOLD, size=18),
-                    ft.Container(content=recent, expand=True),
+                    recent,
                 ], expand=True, scroll=ft.ScrollMode.AUTO),
-                padding=16,
                 expand=True,
             )
         ]
@@ -405,7 +402,6 @@ def main(page: ft.Page):
                     ft.Text("详细数据", weight=ft.FontWeight.BOLD),
                     tbl_box,
                 ], scroll=ft.ScrollMode.AUTO, expand=True),
-                padding=16,
                 expand=True,
             )
         ]
@@ -528,7 +524,6 @@ def main(page: ft.Page):
                     ft.Text("历史记录", weight=ft.FontWeight.BOLD, size=20),
                     list_col,
                 ], expand=True),
-                padding=16,
                 expand=True,
             )
         ]
@@ -561,18 +556,15 @@ def main(page: ft.Page):
 
         def save(_):
             if not (s_d.value and s_t.value and e_d.value and e_t.value):
-                sb = ft.SnackBar(ft.Text("请选择完整的时间"))
-                page.open(sb)
+                page.open(ft.SnackBar(ft.Text("请选择完整的时间")))
                 return
             st = datetime.combine(s_d.value, s_t.value)
             en = datetime.combine(e_d.value, e_t.value)
             if en <= st:
-                sb = ft.SnackBar(ft.Text("结束时间必须晚于开始时间"))
-                page.open(sb)
+                page.open(ft.SnackBar(ft.Text("结束时间必须晚于开始时间")))
                 return
             add_record(st, en, loc.value, acts.get_value(), note.value)
-            sb = ft.SnackBar(ft.Text("记录已保存！"))
-            page.open(sb)
+            page.open(ft.SnackBar(ft.Text("记录已保存！")))
             s_d_l.value = "未选择"
             s_t_l.value = "未选择"
             e_d_l.value = "未选择"
@@ -612,7 +604,6 @@ def main(page: ft.Page):
                         bgcolor=ft.Colors.BLUE, color=ft.Colors.WHITE, width=200,
                     ),
                 ], scroll=ft.ScrollMode.AUTO, expand=True),
-                padding=16,
                 expand=True,
             )
         ]
