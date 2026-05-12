@@ -20,7 +20,7 @@ def main(page: ft.Page):
 
     recording = False
     start_time = None
-    timer_thread = None
+    timer_task = None
 
     content = ft.Column(expand=True)
 
@@ -90,7 +90,7 @@ def main(page: ft.Page):
 
     # ==================== 记录页面 ====================
     def build_record():
-        nonlocal recording, start_time, timer_thread
+        nonlocal recording, start_time, timer_task
         timer_t = ft.Text("00:00:00", size=48, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)
         status = ft.Text("点击开始记录头晕", text_align=ft.TextAlign.CENTER)
 
@@ -98,32 +98,52 @@ def main(page: ft.Page):
         acts = make_action_selector()
         note = ft.TextField(label="备注", multiline=True, min_lines=2)
 
-        def tick():
+        import asyncio
+
+        async def tick():
             while recording:
                 if recording and start_time:
-                    def update_timer():
-                        s = int((datetime.now() - start_time).total_seconds())
-                        h, r = divmod(s, 3600)
-                        m, s = divmod(r, 60)
-                        timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
-                        page.update()
-                    page.loop.call_soon_threadsafe(update_timer)
-                time.sleep(1)
+                    s = int((datetime.now() - start_time).total_seconds())
+                    h, r = divmod(s, 3600)
+                    m, s = divmod(r, 60)
+                    timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
+                    page.update()
+                await asyncio.sleep(1)
 
         def on_start(_):
-            nonlocal recording, start_time, timer_thread
+            nonlocal recording, start_time, timer_task
             recording, start_time = True, datetime.now()
             status.value = "正在记录..."
             b_start.visible = False
             b_stop.visible = True
             form.visible = False
-            timer_thread = threading.Thread(target=tick, daemon=True)
-            timer_thread.start()
+            try:
+                timer_task = page.run_task(tick())
+            except Exception:
+                def thread_tick():
+                    while recording:
+                        try:
+                            if recording and start_time:
+                                s = int((datetime.now() - start_time).total_seconds())
+                                h, r = divmod(s, 3600)
+                                m, s = divmod(r, 60)
+                                timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
+                                page.update()
+                        except Exception:
+                            pass
+                        time.sleep(1)
+                threading.Thread(target=thread_tick, daemon=True).start()
             page.update()
 
         def on_stop(_):
-            nonlocal recording
+            nonlocal recording, timer_task
             recording = False
+            if timer_task:
+                try:
+                    timer_task.cancel()
+                except Exception:
+                    pass
+                timer_task = None
             status.value = "请填写信息后保存"
             b_stop.visible = False
             b_save.visible = True
@@ -132,9 +152,14 @@ def main(page: ft.Page):
             page.update()
 
         def on_save(_):
-            nonlocal recording, start_time
-            add_record(start_time, datetime.now(), loc.value, acts.get_value(), note.value)
+            nonlocal recording, start_time, timer_task
             recording, start_time = False, None
+            if timer_task:
+                try:
+                    timer_task.cancel()
+                except Exception:
+                    pass
+                timer_task = None
             timer_t.value = "00:00:00"
             status.value = "记录已保存！"
             b_start.visible = True
@@ -149,8 +174,14 @@ def main(page: ft.Page):
             refresh_recent()
 
         def on_cancel(_):
-            nonlocal recording, start_time
+            nonlocal recording, start_time, timer_task
             recording, start_time = False, None
+            if timer_task:
+                try:
+                    timer_task.cancel()
+                except Exception:
+                    pass
+                timer_task = None
             timer_t.value = "00:00:00"
             status.value = "已取消"
             b_start.visible = True
@@ -175,14 +206,14 @@ def main(page: ft.Page):
             visible=False,
         )
 
-        recent = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=8)
+        recent = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=8)
 
         def refresh_recent():
             recent.controls.clear()
-            records = get_all_records()[:10]
-            if not records:
+            recs = get_all_records()[:10]
+            if not recs:
                 recent.controls.append(ft.Text("暂无记录", text_align=ft.TextAlign.CENTER))
-            for r in records:
+            for r in recs:
                 recent.controls.append(
                     ft.Card(
                         content=ft.Container(
@@ -203,21 +234,16 @@ def main(page: ft.Page):
         content.controls = [
             ft.Container(
                 content=ft.Column([
-                    ft.Container(
-                        content=ft.Column([
-                            timer_t,
-                            status,
-                            ft.Row([b_start, b_stop], alignment=ft.MainAxisAlignment.CENTER),
-                            form,
-                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
-                        alignment=ft.alignment.center,
-                        padding=20,
-                    ),
+                    timer_t,
+                    status,
+                    ft.Row([b_start, b_stop], alignment=ft.MainAxisAlignment.CENTER),
+                    form,
                     ft.Divider(),
                     ft.Text("最近记录", weight=ft.FontWeight.BOLD, size=18),
                     recent,
-                ], expand=True, scroll=ft.ScrollMode.AUTO),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO),
                 padding=16,
+                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
@@ -244,7 +270,7 @@ def main(page: ft.Page):
         c_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
         t_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
         a_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
-        chart_box = ft.Container(expand=True, alignment=ft.alignment.center)
+        chart_box = ft.Container(height=250)
         tbl_box = ft.Container()
 
         def analyze(_):
@@ -380,7 +406,7 @@ def main(page: ft.Page):
                         ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: dp.pick_date()),
                         date_lbl,
                         analyze_btn,
-                    ], wrap=True, alignment=ft.MainAxisAlignment.CENTER),
+                    ], wrap=True),
                     ft.Divider(),
                     ft.Row([
                         ft.Card(content=ft.Container(
@@ -403,6 +429,7 @@ def main(page: ft.Page):
                     tbl_box,
                 ], scroll=ft.ScrollMode.AUTO),
                 padding=16,
+                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
@@ -417,7 +444,7 @@ def main(page: ft.Page):
             list_col.controls.clear()
             recs = get_all_records()
             if not recs:
-                list_col.controls.append(ft.Text("暂无记录", text_align=ft.TextAlign.CENTER))
+                list_col.controls.append(ft.Text("暂无记录"))
             for r in recs:
                 def edit_handler(rid):
                     return lambda _: do_edit(rid)
@@ -449,18 +476,21 @@ def main(page: ft.Page):
         def do_del(rid):
             def yes(_):
                 delete_record(rid)
-                page.close(dlg)
+                dlg.open = False
+                page.update()
                 refresh()
 
             dlg = ft.AlertDialog(
                 title=ft.Text("确认删除"),
                 content=ft.Text("确定删除这条记录？"),
                 actions=[
-                    ft.TextButton("取消", on_click=lambda _: page.close(dlg)),
+                    ft.TextButton("取消", on_click=lambda _: setattr(dlg, "open", False) or page.update()),
                     ft.TextButton("删除", on_click=yes),
                 ],
             )
-            page.open(dlg)
+            page.dialog = dlg
+            dlg.open = True
+            page.update()
 
         def do_edit(rid):
             rec = get_record(rid)
@@ -493,10 +523,13 @@ def main(page: ft.Page):
                 ns = datetime.combine(s_d.value, s_t.value) if s_d.value and s_t.value else st
                 ne = datetime.combine(e_d.value, e_t.value) if e_d.value and e_t.value else en
                 if ne <= ns:
-                    page.open(ft.SnackBar(ft.Text("结束时间必须晚于开始时间")))
+                    page.snack_bar = ft.SnackBar(ft.Text("结束时间必须晚于开始时间"))
+                    page.snack_bar.open = True
+                    page.update()
                     return
                 update_record(rid, ns, ne, loc.value, acts.get_value(), note.value)
-                page.close(dlg)
+                dlg.open = False
+                page.update()
                 refresh()
 
             dlg = ft.AlertDialog(
@@ -509,11 +542,13 @@ def main(page: ft.Page):
                     loc, acts, note,
                 ], tight=True, scroll=ft.ScrollMode.AUTO),
                 actions=[
-                    ft.TextButton("取消", on_click=lambda _: page.close(dlg)),
+                    ft.TextButton("取消", on_click=lambda _: setattr(dlg, "open", False) or page.update()),
                     ft.TextButton("保存", on_click=save),
                 ],
             )
-            page.open(dlg)
+            page.dialog = dlg
+            dlg.open = True
+            page.update()
 
         refresh()
         content.controls = [
@@ -523,6 +558,7 @@ def main(page: ft.Page):
                     list_col,
                 ], expand=True),
                 padding=16,
+                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
@@ -552,15 +588,21 @@ def main(page: ft.Page):
 
         def save(_):
             if not (s_d.value and s_t.value and e_d.value and e_t.value):
-                page.open(ft.SnackBar(ft.Text("请选择完整的时间")))
+                page.snack_bar = ft.SnackBar(ft.Text("请选择完整的时间"))
+                page.snack_bar.open = True
+                page.update()
                 return
             st = datetime.combine(s_d.value, s_t.value)
             en = datetime.combine(e_d.value, e_t.value)
             if en <= st:
-                page.open(ft.SnackBar(ft.Text("结束时间必须晚于开始时间")))
+                page.snack_bar = ft.SnackBar(ft.Text("结束时间必须晚于开始时间"))
+                page.snack_bar.open = True
+                page.update()
                 return
             add_record(st, en, loc.value, acts.get_value(), note.value)
-            page.open(ft.SnackBar(ft.Text("记录已保存！")))
+            page.snack_bar = ft.SnackBar(ft.Text("记录已保存！"))
+            page.snack_bar.open = True
+            page.update()
             s_d_l.value = "未选择"
             s_t_l.value = "未选择"
             e_d_l.value = "未选择"
@@ -601,14 +643,15 @@ def main(page: ft.Page):
                     ),
                 ], scroll=ft.ScrollMode.AUTO),
                 padding=16,
+                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
         page.update()
 
     # 初始显示记录页面
-    page.add(content)
     build_record()
+    page.add(content)
 
 
 ft.app(target=main)
