@@ -20,7 +20,7 @@ def main(page: ft.Page):
 
     recording = False
     start_time = None
-    timer_task = None
+    timer_thread = None
 
     content = ft.Column(expand=True)
 
@@ -90,7 +90,7 @@ def main(page: ft.Page):
 
     # ==================== 记录页面 ====================
     def build_record():
-        nonlocal recording, start_time, timer_task
+        nonlocal recording, start_time, timer_thread
         timer_t = ft.Text("00:00:00", size=48, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)
         status = ft.Text("点击开始记录头晕", text_align=ft.TextAlign.CENTER)
 
@@ -98,52 +98,29 @@ def main(page: ft.Page):
         acts = make_action_selector()
         note = ft.TextField(label="备注", multiline=True, min_lines=2)
 
-        import asyncio
-
-        async def tick():
+        def tick():
             while recording:
-                if recording and start_time:
-                    s = int((datetime.now() - start_time).total_seconds())
-                    h, r = divmod(s, 3600)
-                    m, s = divmod(r, 60)
-                    timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
-                    page.update()
-                await asyncio.sleep(1)
+                s = int((datetime.now() - start_time).total_seconds())
+                h, r = divmod(s, 3600)
+                m, s = divmod(r, 60)
+                timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
+                page.update()
+                time.sleep(1)
 
         def on_start(_):
-            nonlocal recording, start_time, timer_task
+            nonlocal recording, start_time, timer_thread
             recording, start_time = True, datetime.now()
             status.value = "正在记录..."
             b_start.visible = False
             b_stop.visible = True
             form.visible = False
-            try:
-                timer_task = page.run_task(tick())
-            except Exception:
-                def thread_tick():
-                    while recording:
-                        try:
-                            if recording and start_time:
-                                s = int((datetime.now() - start_time).total_seconds())
-                                h, r = divmod(s, 3600)
-                                m, s = divmod(r, 60)
-                                timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
-                                page.update()
-                        except Exception:
-                            pass
-                        time.sleep(1)
-                threading.Thread(target=thread_tick, daemon=True).start()
+            timer_thread = threading.Thread(target=tick, daemon=True)
+            timer_thread.start()
             page.update()
 
         def on_stop(_):
-            nonlocal recording, timer_task
+            nonlocal recording
             recording = False
-            if timer_task:
-                try:
-                    timer_task.cancel()
-                except Exception:
-                    pass
-                timer_task = None
             status.value = "请填写信息后保存"
             b_stop.visible = False
             b_save.visible = True
@@ -152,14 +129,9 @@ def main(page: ft.Page):
             page.update()
 
         def on_save(_):
-            nonlocal recording, start_time, timer_task
+            nonlocal recording, start_time
+            add_record(start_time, datetime.now(), loc.value, acts.get_value(), note.value)
             recording, start_time = False, None
-            if timer_task:
-                try:
-                    timer_task.cancel()
-                except Exception:
-                    pass
-                timer_task = None
             timer_t.value = "00:00:00"
             status.value = "记录已保存！"
             b_start.visible = True
@@ -174,14 +146,8 @@ def main(page: ft.Page):
             refresh_recent()
 
         def on_cancel(_):
-            nonlocal recording, start_time, timer_task
+            nonlocal recording, start_time
             recording, start_time = False, None
-            if timer_task:
-                try:
-                    timer_task.cancel()
-                except Exception:
-                    pass
-                timer_task = None
             timer_t.value = "00:00:00"
             status.value = "已取消"
             b_start.visible = True
@@ -206,14 +172,11 @@ def main(page: ft.Page):
             visible=False,
         )
 
-        recent = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=8)
+        recent = ft.Column(scroll=ft.ScrollMode.AUTO, height=200)
 
         def refresh_recent():
             recent.controls.clear()
-            recs = get_all_records()[:10]
-            if not recs:
-                recent.controls.append(ft.Text("暂无记录", text_align=ft.TextAlign.CENTER))
-            for r in recs:
+            for r in get_all_records()[:5]:
                 recent.controls.append(
                     ft.Card(
                         content=ft.Container(
@@ -234,6 +197,7 @@ def main(page: ft.Page):
         content.controls = [
             ft.Container(
                 content=ft.Column([
+                    ft.Container(height=30),
                     timer_t,
                     status,
                     ft.Row([b_start, b_stop], alignment=ft.MainAxisAlignment.CENTER),
@@ -243,11 +207,9 @@ def main(page: ft.Page):
                     recent,
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO),
                 padding=16,
-                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
-        page.update()
 
     # ==================== 统计页面 ====================
     def build_stats():
@@ -270,137 +232,133 @@ def main(page: ft.Page):
         c_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
         t_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
         a_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
-        chart_box = ft.Container(height=250)
+        chart_box = ft.Container(expand=True)
         tbl_box = ft.Container()
 
         def analyze(_):
+            v = view_dd.value
+            d = dp.value or datetime.now().date()
+
+            if v == "日":
+                s = datetime.combine(d, datetime.min.time())
+                e = s + timedelta(days=1)
+            elif v == "周":
+                m = d - timedelta(days=d.weekday())
+                s = datetime.combine(m, datetime.min.time())
+                e = s + timedelta(days=7)
+            elif v == "月":
+                s = datetime.combine(d.replace(day=1), datetime.min.time())
+                nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+                e = datetime.combine(nxt, datetime.min.time())
+            else:
+                s = datetime(d.year, 1, 1)
+                e = datetime(d.year + 1, 1, 1)
+
+            recs = get_records_by_date_range(s, e)
+            if not recs:
+                c_txt.value = "0"
+                t_txt.value = "0"
+                a_txt.value = "0"
+                chart_box.content = ft.Text("暂无数据", text_align=ft.TextAlign.CENTER)
+                tbl_box.content = ft.Text("")
+                page.update()
+                return
+
+            cnt = len(recs)
+            tot = sum(r["duration_seconds"] or 0 for r in recs)
+            avg = tot // cnt
+            c_txt.value = str(cnt)
+            t_txt.value = format_duration(tot)
+            a_txt.value = format_duration(avg)
+
+            if v == "日":
+                h = defaultdict(int)
+                for r in recs:
+                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                    h[t.hour] += r["duration_seconds"] or 0
+                df = pd.DataFrame({
+                    "小时": list(range(24)),
+                    "时长(分)": [h.get(i, 0) / 60 for i in range(24)],
+                })
+                fig = px.bar(df, x="小时", y="时长(分)", title=f"{s.date()} 各小时时长")
+                fig.update_layout(xaxis=dict(tickmode="linear", dtick=1))
+            elif v == "周":
+                h = defaultdict(int)
+                wd = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+                for r in recs:
+                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                    h[t.weekday()] += r["duration_seconds"] or 0
+                df = pd.DataFrame({
+                    "星期": wd,
+                    "时长(分)": [h.get(i, 0) / 60 for i in range(7)],
+                })
+                fig = px.bar(df, x="星期", y="时长(分)", title="每周时长")
+            elif v == "月":
+                h = defaultdict(int)
+                for r in recs:
+                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                    h[t.day] += r["duration_seconds"] or 0
+                days = (e - s).days
+                df = pd.DataFrame({
+                    "日期": list(range(1, days + 1)),
+                    "时长(分)": [h.get(i, 0) / 60 for i in range(1, days + 1)],
+                })
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df["日期"], y=df["时长(分)"], mode="lines+markers"))
+                fig.update_layout(
+                    title=f"{s.year}年{s.month}月 每日时长",
+                    xaxis_title="日期",
+                    yaxis_title="时长（分钟）",
+                )
+            else:
+                h = defaultdict(int)
+                for r in recs:
+                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                    h[t.month] += r["duration_seconds"] or 0
+                mo = [f"{i}月" for i in range(1, 13)]
+                df = pd.DataFrame({
+                    "月份": mo,
+                    "时长(分)": [h.get(i, 0) / 60 for i in range(1, 13)],
+                })
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=df["月份"], y=df["时长(分)"],
+                    mode="lines+markers", marker=dict(size=10),
+                ))
+                fig.update_layout(
+                    title=f"{s.year}年 每月时长",
+                    xaxis_title="月份",
+                    yaxis_title="时长（分钟）",
+                )
+
             try:
-                v = view_dd.value
-                d = dp.value or datetime.now().date()
+                chart_box.content = ft.PlotlyChart(fig, expand=True, original_size=False)
+            except Exception:
+                chart_box.content = ft.Text("图表在此设备暂不支持显示", text_align=ft.TextAlign.CENTER)
 
-                if v == "日":
-                    s = datetime.combine(d, datetime.min.time())
-                    e = s + timedelta(days=1)
-                elif v == "周":
-                    m = d - timedelta(days=d.weekday())
-                    s = datetime.combine(m, datetime.min.time())
-                    e = s + timedelta(days=7)
-                elif v == "月":
-                    s = datetime.combine(d.replace(day=1), datetime.min.time())
-                    nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
-                    e = datetime.combine(nxt, datetime.min.time())
-                else:
-                    s = datetime(d.year, 1, 1)
-                    e = datetime(d.year + 1, 1, 1)
-
-                recs = get_records_by_date_range(s, e)
-                if not recs:
-                    c_txt.value = "0"
-                    t_txt.value = "0"
-                    a_txt.value = "0"
-                    chart_box.content = ft.Text("暂无数据", text_align=ft.TextAlign.CENTER)
-                    tbl_box.content = ft.Text("")
-                    page.update()
-                    return
-
-                cnt = len(recs)
-                tot = sum(r["duration_seconds"] or 0 for r in recs)
-                avg = tot // cnt
-                c_txt.value = str(cnt)
-                t_txt.value = format_duration(tot)
-                a_txt.value = format_duration(avg)
-
-                fig = None
-                if v == "日":
-                    h = defaultdict(int)
-                    for r in recs:
-                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                        h[t.hour] += r["duration_seconds"] or 0
-                    df = pd.DataFrame({
-                        "小时": list(range(24)),
-                        "时长(分)": [h.get(i, 0) / 60 for i in range(24)],
-                    })
-                    fig = px.bar(df, x="小时", y="时长(分)", title=f"{s.date()} 各小时时长")
-                    fig.update_layout(xaxis=dict(tickmode="linear", dtick=1))
-                elif v == "周":
-                    h = defaultdict(int)
-                    wd = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-                    for r in recs:
-                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                        h[t.weekday()] += r["duration_seconds"] or 0
-                    df = pd.DataFrame({
-                        "星期": wd,
-                        "时长(分)": [h.get(i, 0) / 60 for i in range(7)],
-                    })
-                    fig = px.bar(df, x="星期", y="时长(分)", title="每周时长")
-                elif v == "月":
-                    h = defaultdict(int)
-                    for r in recs:
-                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                        h[t.day] += r["duration_seconds"] or 0
-                    days = (e - s).days
-                    df = pd.DataFrame({
-                        "日期": list(range(1, days + 1)),
-                        "时长(分)": [h.get(i, 0) / 60 for i in range(1, days + 1)],
-                    })
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df["日期"], y=df["时长(分)"], mode="lines+markers"))
-                    fig.update_layout(
-                        title=f"{s.year}年{s.month}月 每日时长",
-                        xaxis_title="日期",
-                        yaxis_title="时长（分钟）",
-                    )
-                else:
-                    h = defaultdict(int)
-                    for r in recs:
-                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                        h[t.month] += r["duration_seconds"] or 0
-                    mo = [f"{i}月" for i in range(1, 13)]
-                    df = pd.DataFrame({
-                        "月份": mo,
-                        "时长(分)": [h.get(i, 0) / 60 for i in range(1, 13)],
-                    })
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=df["月份"], y=df["时长(分)"],
-                        mode="lines+markers", marker=dict(size=10),
-                    ))
-                    fig.update_layout(
-                        title=f"{s.year}年 每月时长",
-                        xaxis_title="月份",
-                        yaxis_title="时长（分钟）",
-                    )
-
-                try:
-                    chart_box.content = ft.PlotlyChart(fig, expand=True, original_size=False)
-                except Exception:
-                    chart_box.content = ft.Text("图表在此设备暂不支持显示", text_align=ft.TextAlign.CENTER)
-
-                dd = pd.DataFrame(recs)
-                dd["duration"] = dd["duration_seconds"].apply(format_duration)
-                dd["actions_str"] = dd["actions"].apply(lambda x: ", ".join(x) if x else "")
-                dd = dd[["start_time", "end_time", "duration", "location", "actions_str", "notes"]]
-                dd.columns = ["开始时间", "结束时间", "时长", "地点", "动作", "备注"]
-                rows = [
-                    ft.DataRow(cells=[ft.DataCell(ft.Text(str(v))) for v in row])
-                    for _, row in dd.iterrows()
-                ]
-                tbl_box.content = ft.Column([
-                    ft.DataTable(
-                        columns=[ft.DataColumn(ft.Text(c)) for c in dd.columns],
-                        rows=rows,
-                    )
-                ], scroll=ft.ScrollMode.AUTO)
-                page.update()
-            except Exception as ex:
-                chart_box.content = ft.Text(f"加载统计出错: {str(ex)}", text_align=ft.TextAlign.CENTER)
-                page.update()
+            dd = pd.DataFrame(recs)
+            dd["duration"] = dd["duration_seconds"].apply(format_duration)
+            dd["actions_str"] = dd["actions"].apply(lambda x: ", ".join(x) if x else "")
+            dd = dd[["start_time", "end_time", "duration", "location", "actions_str", "notes"]]
+            dd.columns = ["开始时间", "结束时间", "时长", "地点", "动作", "备注"]
+            rows = [
+                ft.DataRow(cells=[ft.DataCell(ft.Text(str(v))) for v in row])
+                for _, row in dd.iterrows()
+            ]
+            tbl_box.content = ft.Column([
+                ft.DataTable(
+                    columns=[ft.DataColumn(ft.Text(c)) for c in dd.columns],
+                    rows=rows,
+                )
+            ], scroll=ft.ScrollMode.AUTO)
+            page.update()
 
         analyze_btn = ft.ElevatedButton("分析", icon=ft.Icons.ANALYTICS, on_click=analyze)
 
         content.controls = [
             ft.Container(
                 content=ft.Column([
+                    ft.Container(height=30),
                     ft.Row([
                         view_dd,
                         ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: dp.pick_date()),
@@ -429,12 +387,10 @@ def main(page: ft.Page):
                     tbl_box,
                 ], scroll=ft.ScrollMode.AUTO),
                 padding=16,
-                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
         analyze(None)
-        page.update()
 
     # ==================== 历史页面 ====================
     def build_history():
@@ -554,15 +510,14 @@ def main(page: ft.Page):
         content.controls = [
             ft.Container(
                 content=ft.Column([
+                    ft.Container(height=30),
                     ft.Text("历史记录", weight=ft.FontWeight.BOLD, size=20),
                     list_col,
                 ], expand=True),
                 padding=16,
-                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
-        page.update()
 
     # ==================== 新增页面 ====================
     def build_add():
@@ -615,6 +570,7 @@ def main(page: ft.Page):
         content.controls = [
             ft.Container(
                 content=ft.Column([
+                    ft.Container(height=30),
                     ft.Text("手动新增", weight=ft.FontWeight.BOLD, size=20),
                     ft.Text("开始时间", weight=ft.FontWeight.BOLD),
                     ft.Row([
@@ -643,11 +599,9 @@ def main(page: ft.Page):
                     ),
                 ], scroll=ft.ScrollMode.AUTO),
                 padding=16,
-                margin=ft.margin.only(top=30),
                 expand=True,
             )
         ]
-        page.update()
 
     # 初始显示记录页面
     build_record()
