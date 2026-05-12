@@ -100,11 +100,23 @@ def main(page: ft.Page):
 
         def tick():
             while recording:
-                s = int((datetime.now() - start_time).total_seconds())
-                h, r = divmod(s, 3600)
-                m, s = divmod(r, 60)
-                timer_t.value = f"{h:02d}:{m:02d}:{s:02d}"
-                page.update()
+                if recording and start_time:
+                    s = int((datetime.now() - start_time).total_seconds())
+                    h, r = divmod(s, 3600)
+                    m, s = divmod(r, 60)
+                    new_val = f"{h:02d}:{m:02d}:{s:02d}"
+
+                    def do_update():
+                        timer_t.value = new_val
+                        page.update()
+
+                    try:
+                        if hasattr(page, 'loop') and page.loop:
+                            page.loop.call_soon_threadsafe(do_update)
+                        else:
+                            do_update()
+                    except Exception:
+                        do_update()
                 time.sleep(1)
 
         def on_start(_):
@@ -236,8 +248,9 @@ def main(page: ft.Page):
         tbl_box = ft.Container()
 
         def analyze(_):
-            v = view_dd.value
-            d = dp.value or datetime.now().date()
+            try:
+                v = view_dd.value
+                d = dp.value or datetime.now().date()
 
             if v == "日":
                 s = datetime.combine(d, datetime.min.time())
@@ -351,7 +364,10 @@ def main(page: ft.Page):
                     rows=rows,
                 )
             ], scroll=ft.ScrollMode.AUTO)
-            page.update()
+                page.update()
+            except Exception as ex:
+                chart_box.content = ft.Text(f"统计出错: {str(ex)}", text_align=ft.TextAlign.CENTER)
+                page.update()
 
         analyze_btn = ft.ElevatedButton("分析", icon=ft.Icons.ANALYTICS, on_click=analyze)
 
