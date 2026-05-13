@@ -248,9 +248,8 @@ def main(page: ft.Page):
         tbl_box = ft.Container()
 
         def analyze(_):
-            try:
-                v = view_dd.value
-                d = dp.value or datetime.now().date()
+            v = view_dd.value
+            d = dp.value or datetime.now().date()
 
             if v == "日":
                 s = datetime.combine(d, datetime.min.time())
@@ -364,10 +363,7 @@ def main(page: ft.Page):
                     rows=rows,
                 )
             ], scroll=ft.ScrollMode.AUTO)
-                page.update()
-            except Exception as ex:
-                chart_box.content = ft.Text(f"统计出错: {str(ex)}", text_align=ft.TextAlign.CENTER)
-                page.update()
+            page.update()
 
         analyze_btn = ft.ElevatedButton("分析", icon=ft.Icons.ANALYTICS, on_click=analyze)
 
