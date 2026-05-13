@@ -13,14 +13,14 @@ def _build_bar_chart(labels, values, title):
     max_val = max(values) if values else 1
     bars = []
     for label, val in zip(labels, values):
-        bar_h = (val / max_val) * 140 if max_val > 0 else 0
+        bar_h = int((val / max_val) * 140)
         bars.append(
             ft.Column([
                 ft.Text(f"{val:.0f}", size=8),
                 ft.Container(
                     width=14,
-                    height=bar_h,
-                    bgcolor=ft.colors.BLUE_400 if val > 0 else ft.colors.GREY_300,
+                    height=max(bar_h, 2),
+                    bgcolor=ft.colors.BLUE if val > 0 else ft.colors.GREY_400,
                     border_radius=2,
                 ),
                 ft.Text(str(label), size=8, text_align=ft.TextAlign.CENTER),
@@ -38,51 +38,28 @@ def _build_bar_chart(labels, values, title):
 
 def _build_line_chart(labels, values, title):
     max_val = max(values) if values else 1
-    chart_h = 160
-    chart_w = 300
-    n = max(len(values), 1)
-
-    points = []
-    for i, val in enumerate(values):
-        x = (i / max(n - 1, 1)) * chart_w
-        y = chart_h - (val / max_val) * chart_h if max_val > 0 else chart_h
-        points.append((x, y, val))
-
-    # 用细条模拟连线 + 圆点
-    shapes = []
-    for i in range(len(points) - 1):
-        x1, y1, _ = points[i]
-        x2, y2, _ = points[i + 1]
-        # 水平或垂直的阶梯线
-        mid_x = (x1 + x2) / 2
-        shapes.append(
-            ft.Container(width=abs(mid_x - x1), height=2, bgcolor=ft.colors.BLUE_200,
-                        left=min(x1, mid_x), top=y1)
+    rows = []
+    for label, val in zip(labels, values):
+        bar_h = int((val / max_val) * 120)
+        rows.append(
+            ft.Column([
+                ft.Container(
+                    width=20,
+                    height=max(bar_h, 2),
+                    bgcolor=ft.colors.BLUE if val > 0 else ft.colors.GREY_400,
+                    border_radius=2,
+                ),
+                ft.Text(f"{val:.0f}", size=8),
+                ft.Text(str(label), size=8),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2)
         )
-        shapes.append(
-            ft.Container(width=2, height=abs(y2 - y1), bgcolor=ft.colors.BLUE_200,
-                        left=mid_x, top=min(y1, y2))
-        )
-        shapes.append(
-            ft.Container(width=abs(x2 - mid_x), height=2, bgcolor=ft.colors.BLUE_200,
-                        left=min(mid_x, x2), top=y2)
-        )
-
-    for x, y, _ in points:
-        shapes.append(
-            ft.Container(width=8, height=8, bgcolor=ft.colors.BLUE_500,
-                        border_radius=4, left=x - 4, top=y - 4)
-        )
-
-    x_labels_row = ft.Row([
-        ft.Text(str(l), size=8, width=chart_w // n, text_align=ft.TextAlign.CENTER)
-        for l in labels
-    ], width=chart_w)
-
     return ft.Column([
         ft.Text(title, size=12, weight=ft.FontWeight.BOLD),
-        ft.Container(content=ft.Stack(shapes), width=chart_w, height=chart_h),
-        x_labels_row,
+        ft.Container(
+            content=ft.Row(rows, alignment=ft.MainAxisAlignment.SPACE_EVENLY, scroll=ft.ScrollMode.AUTO),
+            height=180,
+            padding=ft.padding.only(top=4),
+        ),
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
 
@@ -290,7 +267,6 @@ def main(page: ft.Page):
         content.controls = [
             ft.Container(
                 content=ft.Column([
-                    ft.Container(height=30),
                     timer_t,
                     status,
                     ft.Row([b_start, b_stop], alignment=ft.MainAxisAlignment.CENTER),
@@ -298,8 +274,8 @@ def main(page: ft.Page):
                     ft.Divider(),
                     ft.Text("最近记录", weight=ft.FontWeight.BOLD, size=18),
                     recent,
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO, expand=True),
-                padding=16,
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
+                padding=ft.padding.only(left=16, right=16, top=80, bottom=16),
                 expand=True,
             )
         ]
@@ -325,102 +301,109 @@ def main(page: ft.Page):
         c_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
         t_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
         a_txt = ft.Text("0", size=32, weight=ft.FontWeight.BOLD)
-        chart_box = ft.Container(expand=True)
-        tbl_box = ft.Container()
+        chart_box = ft.Container(content=ft.Text("点击下方「分析」按钮查看数据", text_align=ft.TextAlign.CENTER), height=220)
+        tbl_box = ft.Container(content=ft.Text(""))
 
         def analyze(_):
-            v = view_dd.value
-            d = dp.value or datetime.now().date()
+            try:
+                v = view_dd.value
+                d = dp.value or datetime.now().date()
 
-            if v == "日":
-                s = datetime.combine(d, datetime.min.time())
-                e = s + timedelta(days=1)
-            elif v == "周":
-                m = d - timedelta(days=d.weekday())
-                s = datetime.combine(m, datetime.min.time())
-                e = s + timedelta(days=7)
-            elif v == "月":
-                s = datetime.combine(d.replace(day=1), datetime.min.time())
-                nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
-                e = datetime.combine(nxt, datetime.min.time())
-            else:
-                s = datetime(d.year, 1, 1)
-                e = datetime(d.year + 1, 1, 1)
+                if v == "日":
+                    s = datetime.combine(d, datetime.min.time())
+                    e = s + timedelta(days=1)
+                elif v == "周":
+                    m = d - timedelta(days=d.weekday())
+                    s = datetime.combine(m, datetime.min.time())
+                    e = s + timedelta(days=7)
+                elif v == "月":
+                    s = datetime.combine(d.replace(day=1), datetime.min.time())
+                    nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+                    e = datetime.combine(nxt, datetime.min.time())
+                else:
+                    s = datetime(d.year, 1, 1)
+                    e = datetime(d.year + 1, 1, 1)
 
-            recs = get_records_by_date_range(s, e)
-            if not recs:
-                c_txt.value = "0"
-                t_txt.value = "0"
-                a_txt.value = "0"
-                chart_box.content = ft.Text("暂无数据", text_align=ft.TextAlign.CENTER)
-                tbl_box.content = ft.Text("")
+                recs = get_records_by_date_range(s, e)
+                if not recs:
+                    c_txt.value = "0"
+                    t_txt.value = "0"
+                    a_txt.value = "0"
+                    chart_box.content = ft.Text("暂无数据", text_align=ft.TextAlign.CENTER)
+                    tbl_box.content = ft.Text("")
+                    page.update()
+                    return
+
+                cnt = len(recs)
+                tot = sum(r["duration_seconds"] or 0 for r in recs)
+                avg = tot // cnt
+                c_txt.value = str(cnt)
+                t_txt.value = format_duration(tot)
+                a_txt.value = format_duration(avg)
+
+                if v == "日":
+                    h = defaultdict(int)
+                    for r in recs:
+                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                        h[t.hour] += r["duration_seconds"] or 0
+                    labels = [f"{i}时" for i in range(24)]
+                    values = [h.get(i, 0) / 60 for i in range(24)]
+                    chart_box.content = render_chart(labels, values, f"{s.date()} 各小时时长", "", "", "bar")
+                elif v == "周":
+                    h = defaultdict(int)
+                    wd = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+                    for r in recs:
+                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                        h[t.weekday()] += r["duration_seconds"] or 0
+                    values = [h.get(i, 0) / 60 for i in range(7)]
+                    chart_box.content = render_chart(wd, values, "每周时长", "", "", "line")
+                elif v == "月":
+                    h = defaultdict(int)
+                    for r in recs:
+                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                        h[t.day] += r["duration_seconds"] or 0
+                    days = (e - s).days
+                    labels = [str(i) for i in range(1, days + 1)]
+                    values = [h.get(i, 0) / 60 for i in range(1, days + 1)]
+                    chart_box.content = render_chart(labels, values, f"{s.year}年{s.month}月 每日时长", "", "", "line")
+                else:
+                    h = defaultdict(int)
+                    for r in recs:
+                        t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
+                        h[t.month] += r["duration_seconds"] or 0
+                    labels = [f"{i}月" for i in range(1, 13)]
+                    values = [h.get(i, 0) / 60 for i in range(1, 13)]
+                    chart_box.content = render_chart(labels, values, f"{s.year}年 每月时长", "", "", "line")
+
+                dd = pd.DataFrame(recs)
+                dd["duration"] = dd["duration_seconds"].apply(format_duration)
+                dd["actions_str"] = dd["actions"].apply(lambda x: ", ".join(x) if x else "")
+                dd = dd[["start_time", "end_time", "duration", "location", "actions_str", "notes"]]
+                dd.columns = ["开始时间", "结束时间", "时长", "地点", "动作", "备注"]
+                rows = [
+                    ft.DataRow(cells=[ft.DataCell(ft.Text(str(v))) for v in row])
+                    for _, row in dd.iterrows()
+                ]
+                tbl_box.content = ft.Column([
+                    ft.DataTable(
+                        columns=[ft.DataColumn(ft.Text(c)) for c in dd.columns],
+                        rows=rows,
+                    )
+                ], scroll=ft.ScrollMode.AUTO)
                 page.update()
-                return
-
-            cnt = len(recs)
-            tot = sum(r["duration_seconds"] or 0 for r in recs)
-            avg = tot // cnt
-            c_txt.value = str(cnt)
-            t_txt.value = format_duration(tot)
-            a_txt.value = format_duration(avg)
-
-            if v == "日":
-                h = defaultdict(int)
-                for r in recs:
-                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                    h[t.hour] += r["duration_seconds"] or 0
-                labels = [f"{i}时" for i in range(24)]
-                values = [h.get(i, 0) / 60 for i in range(24)]
-                chart_box.content = render_chart(labels, values, f"{s.date()} 各小时时长", "", "", "bar")
-            elif v == "周":
-                h = defaultdict(int)
-                wd = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-                for r in recs:
-                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                    h[t.weekday()] += r["duration_seconds"] or 0
-                values = [h.get(i, 0) / 60 for i in range(7)]
-                chart_box.content = render_chart(wd, values, "每周时长", "", "", "line")
-            elif v == "月":
-                h = defaultdict(int)
-                for r in recs:
-                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                    h[t.day] += r["duration_seconds"] or 0
-                days = (e - s).days
-                labels = [str(i) for i in range(1, days + 1)]
-                values = [h.get(i, 0) / 60 for i in range(1, days + 1)]
-                chart_box.content = render_chart(labels, values, f"{s.year}年{s.month}月 每日时长", "", "", "line")
-            else:
-                h = defaultdict(int)
-                for r in recs:
-                    t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
-                    h[t.month] += r["duration_seconds"] or 0
-                labels = [f"{i}月" for i in range(1, 13)]
-                values = [h.get(i, 0) / 60 for i in range(1, 13)]
-                chart_box.content = render_chart(labels, values, f"{s.year}年 每月时长", "", "", "line")
-
-            dd = pd.DataFrame(recs)
-            dd["duration"] = dd["duration_seconds"].apply(format_duration)
-            dd["actions_str"] = dd["actions"].apply(lambda x: ", ".join(x) if x else "")
-            dd = dd[["start_time", "end_time", "duration", "location", "actions_str", "notes"]]
-            dd.columns = ["开始时间", "结束时间", "时长", "地点", "动作", "备注"]
-            rows = [
-                ft.DataRow(cells=[ft.DataCell(ft.Text(str(v))) for v in row])
-                for _, row in dd.iterrows()
-            ]
-            tbl_box.content = ft.Column([
-                ft.DataTable(
-                    columns=[ft.DataColumn(ft.Text(c)) for c in dd.columns],
-                    rows=rows,
-                )
-            ], scroll=ft.ScrollMode.AUTO)
-            page.update()
+            except Exception as ex:
+                c_txt.value = "错误"
+                t_txt.value = str(type(ex).__name__)
+                a_txt.value = ""
+                chart_box.content = ft.Text(f"分析出错: {ex}", text_align=ft.TextAlign.CENTER)
+                page.update()
 
         analyze_btn = ft.ElevatedButton("分析", icon=ft.Icons.ANALYTICS, on_click=analyze)
 
         content.controls = [
             ft.Container(
                 content=ft.Column([
-                    ft.Container(height=30),
+                    ft.Container(height=10),
                     ft.Row([
                         view_dd,
                         ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: page.open(dp)),
@@ -452,7 +435,6 @@ def main(page: ft.Page):
                 expand=True,
             )
         ]
-        analyze(None)
 
     # ==================== 历史页面 ====================
     def build_history():
