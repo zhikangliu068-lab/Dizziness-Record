@@ -4,41 +4,92 @@ import threading
 import time
 from collections import defaultdict
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import io
-import base64
 from db import *
 
 ACTION_OPTIONS = ["扭头", "低头", "蹲起", "站立", "躺下", "起床", "跑步", "久坐", "其他"]
 
 
-def render_chart(x_labels, y_values, title, x_label, y_label, chart_type="bar"):
-    fig, ax = plt.subplots(figsize=(10, 4.5))
+def _build_bar_chart(labels, values, title):
+    max_val = max(values) if values else 1
+    bars = []
+    for label, val in zip(labels, values):
+        bar_h = (val / max_val) * 140 if max_val > 0 else 0
+        bars.append(
+            ft.Column([
+                ft.Text(f"{val:.0f}", size=8),
+                ft.Container(
+                    width=14,
+                    height=bar_h,
+                    bgcolor=ft.colors.BLUE_400 if val > 0 else ft.colors.GREY_300,
+                    border_radius=2,
+                ),
+                ft.Text(str(label), size=8, text_align=ft.TextAlign.CENTER),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2)
+        )
+    return ft.Column([
+        ft.Text(title, size=12, weight=ft.FontWeight.BOLD),
+        ft.Container(
+            content=ft.Row(bars, alignment=ft.MainAxisAlignment.SPACE_EVENLY, scroll=ft.ScrollMode.AUTO),
+            height=190,
+            padding=ft.padding.only(top=4),
+        ),
+    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+
+
+def _build_line_chart(labels, values, title):
+    max_val = max(values) if values else 1
+    chart_h = 160
+    chart_w = 300
+    n = max(len(values), 1)
+
+    points = []
+    for i, val in enumerate(values):
+        x = (i / max(n - 1, 1)) * chart_w
+        y = chart_h - (val / max_val) * chart_h if max_val > 0 else chart_h
+        points.append((x, y, val))
+
+    # 用细条模拟连线 + 圆点
+    shapes = []
+    for i in range(len(points) - 1):
+        x1, y1, _ = points[i]
+        x2, y2, _ = points[i + 1]
+        # 水平或垂直的阶梯线
+        mid_x = (x1 + x2) / 2
+        shapes.append(
+            ft.Container(width=abs(mid_x - x1), height=2, bgcolor=ft.colors.BLUE_200,
+                        left=min(x1, mid_x), top=y1)
+        )
+        shapes.append(
+            ft.Container(width=2, height=abs(y2 - y1), bgcolor=ft.colors.BLUE_200,
+                        left=mid_x, top=min(y1, y2))
+        )
+        shapes.append(
+            ft.Container(width=abs(x2 - mid_x), height=2, bgcolor=ft.colors.BLUE_200,
+                        left=min(mid_x, x2), top=y2)
+        )
+
+    for x, y, _ in points:
+        shapes.append(
+            ft.Container(width=8, height=8, bgcolor=ft.colors.BLUE_500,
+                        border_radius=4, left=x - 4, top=y - 4)
+        )
+
+    x_labels_row = ft.Row([
+        ft.Text(str(l), size=8, width=chart_w // n, text_align=ft.TextAlign.CENTER)
+        for l in labels
+    ], width=chart_w)
+
+    return ft.Column([
+        ft.Text(title, size=12, weight=ft.FontWeight.BOLD),
+        ft.Container(content=ft.Stack(shapes), width=chart_w, height=chart_h),
+        x_labels_row,
+    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+
+
+def render_chart(labels, values, title, _x_label, _y_label, chart_type="bar"):
     if chart_type == "bar":
-        ax.bar(range(len(x_labels)), y_values, color="steelblue")
-        ax.set_xticks(range(len(x_labels)))
-        ax.set_xticklabels(x_labels, rotation=45, ha="right")
-    else:
-        ax.plot(range(len(x_labels)), y_values, marker="o", linestyle="-",
-                linewidth=2, markersize=6, color="steelblue")
-        ax.set_xticks(range(len(x_labels)))
-        ax.set_xticklabels(x_labels, rotation=45, ha="right")
-        ax.grid(True, alpha=0.3)
-    ax.set_title(title, fontsize=12)
-    ax.set_xlabel(x_label, fontsize=10)
-    ax.set_ylabel(y_label, fontsize=10)
-    ax.set_ylim(bottom=0)
-    plt.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
-    buf.seek(0)
-    img_b64 = base64.b64encode(buf.read()).decode()
-    plt.close(fig)
-    return img_b64
+        return _build_bar_chart(labels, values, title)
+    return _build_line_chart(labels, values, title)
 
 
 def main(page: ft.Page):
@@ -321,7 +372,7 @@ def main(page: ft.Page):
                     h[t.hour] += r["duration_seconds"] or 0
                 labels = [f"{i}时" for i in range(24)]
                 values = [h.get(i, 0) / 60 for i in range(24)]
-                img_b64 = render_chart(labels, values, f"{s.date()} 各小时时长", "小时", "时长（分钟）", "bar")
+                chart_box.content = render_chart(labels, values, f"{s.date()} 各小时时长", "", "", "bar")
             elif v == "周":
                 h = defaultdict(int)
                 wd = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
@@ -329,7 +380,7 @@ def main(page: ft.Page):
                     t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
                     h[t.weekday()] += r["duration_seconds"] or 0
                 values = [h.get(i, 0) / 60 for i in range(7)]
-                img_b64 = render_chart(wd, values, "每周时长", "星期", "时长（分钟）", "line")
+                chart_box.content = render_chart(wd, values, "每周时长", "", "", "line")
             elif v == "月":
                 h = defaultdict(int)
                 for r in recs:
@@ -338,7 +389,7 @@ def main(page: ft.Page):
                 days = (e - s).days
                 labels = [str(i) for i in range(1, days + 1)]
                 values = [h.get(i, 0) / 60 for i in range(1, days + 1)]
-                img_b64 = render_chart(labels, values, f"{s.year}年{s.month}月 每日时长", "日期", "时长（分钟）", "line")
+                chart_box.content = render_chart(labels, values, f"{s.year}年{s.month}月 每日时长", "", "", "line")
             else:
                 h = defaultdict(int)
                 for r in recs:
@@ -346,9 +397,7 @@ def main(page: ft.Page):
                     h[t.month] += r["duration_seconds"] or 0
                 labels = [f"{i}月" for i in range(1, 13)]
                 values = [h.get(i, 0) / 60 for i in range(1, 13)]
-                img_b64 = render_chart(labels, values, f"{s.year}年 每月时长", "月份", "时长（分钟）", "line")
-
-            chart_box.content = ft.Image(src_base64=img_b64, fit=ft.ImageFit.CONTAIN)
+                chart_box.content = render_chart(labels, values, f"{s.year}年 每月时长", "", "", "line")
 
             dd = pd.DataFrame(recs)
             dd["duration"] = dd["duration_seconds"].apply(format_duration)
