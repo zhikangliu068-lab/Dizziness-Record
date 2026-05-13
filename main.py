@@ -298,10 +298,9 @@ def main(page: ft.Page):
                     ft.Divider(),
                     ft.Text("最近记录", weight=ft.FontWeight.BOLD, size=18),
                     recent,
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO, expand=True),
                 padding=16,
                 expand=True,
-                alignment=ft.alignment.top_center,
             )
         ]
 
@@ -448,7 +447,7 @@ def main(page: ft.Page):
                     ft.Divider(),
                     ft.Text("详细数据", weight=ft.FontWeight.BOLD),
                     tbl_box,
-                ], scroll=ft.ScrollMode.AUTO),
+                ], scroll=ft.ScrollMode.AUTO, expand=True),
                 padding=16,
                 expand=True,
             )
@@ -650,7 +649,7 @@ def main(page: ft.Page):
                         "保存", icon=ft.Icons.SAVE, on_click=save,
                         bgcolor=ft.Colors.BLUE, color=ft.Colors.WHITE, width=200,
                     ),
-                ], scroll=ft.ScrollMode.AUTO),
+                ], scroll=ft.ScrollMode.AUTO, expand=True),
                 padding=16,
                 expand=True,
             )
