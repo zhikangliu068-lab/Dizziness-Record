@@ -6,9 +6,39 @@ from collections import defaultdict
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import io
+import base64
 from db import *
 
 ACTION_OPTIONS = ["扭头", "低头", "蹲起", "站立", "躺下", "起床", "跑步", "久坐", "其他"]
+
+
+def render_chart(x_labels, y_values, title, x_label, y_label, chart_type="bar"):
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    if chart_type == "bar":
+        ax.bar(range(len(x_labels)), y_values, color="steelblue")
+        ax.set_xticks(range(len(x_labels)))
+        ax.set_xticklabels(x_labels, rotation=45, ha="right")
+    else:
+        ax.plot(range(len(x_labels)), y_values, marker="o", linestyle="-",
+                linewidth=2, markersize=6, color="steelblue")
+        ax.set_xticks(range(len(x_labels)))
+        ax.set_xticklabels(x_labels, rotation=45, ha="right")
+        ax.grid(True, alpha=0.3)
+    ax.set_title(title, fontsize=12)
+    ax.set_xlabel(x_label, fontsize=10)
+    ax.set_ylabel(y_label, fontsize=10)
+    ax.set_ylim(bottom=0)
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+    buf.seek(0)
+    img_b64 = base64.b64encode(buf.read()).decode()
+    plt.close(fig)
+    return img_b64
 
 
 def main(page: ft.Page):
@@ -220,6 +250,7 @@ def main(page: ft.Page):
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO),
                 padding=16,
                 expand=True,
+                alignment=ft.alignment.top_center,
             )
         ]
 
@@ -288,65 +319,36 @@ def main(page: ft.Page):
                 for r in recs:
                     t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
                     h[t.hour] += r["duration_seconds"] or 0
-                df = pd.DataFrame({
-                    "小时": list(range(24)),
-                    "时长(分)": [h.get(i, 0) / 60 for i in range(24)],
-                })
-                fig = px.bar(df, x="小时", y="时长(分)", title=f"{s.date()} 各小时时长")
-                fig.update_layout(xaxis=dict(tickmode="linear", dtick=1))
+                labels = [f"{i}时" for i in range(24)]
+                values = [h.get(i, 0) / 60 for i in range(24)]
+                img_b64 = render_chart(labels, values, f"{s.date()} 各小时时长", "小时", "时长（分钟）", "bar")
             elif v == "周":
                 h = defaultdict(int)
                 wd = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
                 for r in recs:
                     t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
                     h[t.weekday()] += r["duration_seconds"] or 0
-                df = pd.DataFrame({
-                    "星期": wd,
-                    "时长(分)": [h.get(i, 0) / 60 for i in range(7)],
-                })
-                fig = px.bar(df, x="星期", y="时长(分)", title="每周时长")
+                values = [h.get(i, 0) / 60 for i in range(7)]
+                img_b64 = render_chart(wd, values, "每周时长", "星期", "时长（分钟）", "line")
             elif v == "月":
                 h = defaultdict(int)
                 for r in recs:
                     t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
                     h[t.day] += r["duration_seconds"] or 0
                 days = (e - s).days
-                df = pd.DataFrame({
-                    "日期": list(range(1, days + 1)),
-                    "时长(分)": [h.get(i, 0) / 60 for i in range(1, days + 1)],
-                })
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df["日期"], y=df["时长(分)"], mode="lines+markers"))
-                fig.update_layout(
-                    title=f"{s.year}年{s.month}月 每日时长",
-                    xaxis_title="日期",
-                    yaxis_title="时长（分钟）",
-                )
+                labels = [str(i) for i in range(1, days + 1)]
+                values = [h.get(i, 0) / 60 for i in range(1, days + 1)]
+                img_b64 = render_chart(labels, values, f"{s.year}年{s.month}月 每日时长", "日期", "时长（分钟）", "line")
             else:
                 h = defaultdict(int)
                 for r in recs:
                     t = datetime.strptime(r["start_time"], "%Y-%m-%d %H:%M:%S")
                     h[t.month] += r["duration_seconds"] or 0
-                mo = [f"{i}月" for i in range(1, 13)]
-                df = pd.DataFrame({
-                    "月份": mo,
-                    "时长(分)": [h.get(i, 0) / 60 for i in range(1, 13)],
-                })
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df["月份"], y=df["时长(分)"],
-                    mode="lines+markers", marker=dict(size=10),
-                ))
-                fig.update_layout(
-                    title=f"{s.year}年 每月时长",
-                    xaxis_title="月份",
-                    yaxis_title="时长（分钟）",
-                )
+                labels = [f"{i}月" for i in range(1, 13)]
+                values = [h.get(i, 0) / 60 for i in range(1, 13)]
+                img_b64 = render_chart(labels, values, f"{s.year}年 每月时长", "月份", "时长（分钟）", "line")
 
-            try:
-                chart_box.content = ft.PlotlyChart(fig, expand=True, original_size=False)
-            except Exception:
-                chart_box.content = ft.Text("图表在此设备暂不支持显示", text_align=ft.TextAlign.CENTER)
+            chart_box.content = ft.Image(src_base64=img_b64, fit=ft.ImageFit.CONTAIN)
 
             dd = pd.DataFrame(recs)
             dd["duration"] = dd["duration_seconds"].apply(format_duration)
@@ -373,7 +375,7 @@ def main(page: ft.Page):
                     ft.Container(height=30),
                     ft.Row([
                         view_dd,
-                        ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: dp.pick_date()),
+                        ft.ElevatedButton("选日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: page.open(dp)),
                         date_lbl,
                         analyze_btn,
                     ], wrap=True),
@@ -444,21 +446,18 @@ def main(page: ft.Page):
         def do_del(rid):
             def yes(_):
                 delete_record(rid)
-                dlg.open = False
-                page.update()
+                page.close(dlg)
                 refresh()
 
             dlg = ft.AlertDialog(
                 title=ft.Text("确认删除"),
                 content=ft.Text("确定删除这条记录？"),
                 actions=[
-                    ft.TextButton("取消", on_click=lambda _: setattr(dlg, "open", False) or page.update()),
+                    ft.TextButton("取消", on_click=lambda _: page.close(dlg)),
                     ft.TextButton("删除", on_click=yes),
                 ],
             )
-            page.dialog = dlg
-            dlg.open = True
-            page.update()
+            page.open(dlg)
 
         def do_edit(rid):
             rec = get_record(rid)
@@ -491,32 +490,27 @@ def main(page: ft.Page):
                 ns = datetime.combine(s_d.value, s_t.value) if s_d.value and s_t.value else st
                 ne = datetime.combine(e_d.value, e_t.value) if e_d.value and e_t.value else en
                 if ne <= ns:
-                    page.snack_bar = ft.SnackBar(ft.Text("结束时间必须晚于开始时间"))
-                    page.snack_bar.open = True
-                    page.update()
+                    page.open(ft.SnackBar(ft.Text("结束时间必须晚于开始时间")))
                     return
                 update_record(rid, ns, ne, loc.value, acts.get_value(), note.value)
-                dlg.open = False
-                page.update()
+                page.close(dlg)
                 refresh()
 
             dlg = ft.AlertDialog(
                 title=ft.Text(f"编辑 #{rid}"),
                 content=ft.Column([
-                    ft.Row([ft.ElevatedButton("开始日期", on_click=lambda _: s_d.pick_date()), s_d_l]),
-                    ft.Row([ft.ElevatedButton("开始时间", on_click=lambda _: s_t.pick_time()), s_t_l]),
-                    ft.Row([ft.ElevatedButton("结束日期", on_click=lambda _: e_d.pick_date()), e_d_l]),
-                    ft.Row([ft.ElevatedButton("结束时间", on_click=lambda _: e_t.pick_time()), e_t_l]),
+                    ft.Row([ft.ElevatedButton("开始日期", on_click=lambda _: page.open(s_d)), s_d_l]),
+                    ft.Row([ft.ElevatedButton("开始时间", on_click=lambda _: page.open(s_t)), s_t_l]),
+                    ft.Row([ft.ElevatedButton("结束日期", on_click=lambda _: page.open(e_d)), e_d_l]),
+                    ft.Row([ft.ElevatedButton("结束时间", on_click=lambda _: page.open(e_t)), e_t_l]),
                     loc, acts, note,
                 ], tight=True, scroll=ft.ScrollMode.AUTO),
                 actions=[
-                    ft.TextButton("取消", on_click=lambda _: setattr(dlg, "open", False) or page.update()),
+                    ft.TextButton("取消", on_click=lambda _: page.close(dlg)),
                     ft.TextButton("保存", on_click=save),
                 ],
             )
-            page.dialog = dlg
-            dlg.open = True
-            page.update()
+            page.open(dlg)
 
         refresh()
         content.controls = [
@@ -555,21 +549,19 @@ def main(page: ft.Page):
 
         def save(_):
             if not (s_d.value and s_t.value and e_d.value and e_t.value):
-                page.snack_bar = ft.SnackBar(ft.Text("请选择完整的时间"))
-                page.snack_bar.open = True
-                page.update()
+                page.open(ft.SnackBar(ft.Text("请选择完整的时间")))
                 return
             st = datetime.combine(s_d.value, s_t.value)
             en = datetime.combine(e_d.value, e_t.value)
             if en <= st:
-                page.snack_bar = ft.SnackBar(ft.Text("结束时间必须晚于开始时间"))
-                page.snack_bar.open = True
-                page.update()
+                page.open(ft.SnackBar(ft.Text("结束时间必须晚于开始时间")))
                 return
             add_record(st, en, loc.value, acts.get_value(), note.value)
-            page.snack_bar = ft.SnackBar(ft.Text("记录已保存！"))
-            page.snack_bar.open = True
-            page.update()
+            page.open(ft.SnackBar(ft.Text("记录已保存！")))
+            s_d.value = None
+            s_t.value = None
+            e_d.value = None
+            e_t.value = None
             s_d_l.value = "未选择"
             s_t_l.value = "未选择"
             e_d_l.value = "未选择"
@@ -586,20 +578,20 @@ def main(page: ft.Page):
                     ft.Text("手动新增", weight=ft.FontWeight.BOLD, size=20),
                     ft.Text("开始时间", weight=ft.FontWeight.BOLD),
                     ft.Row([
-                        ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: s_d.pick_date()),
+                        ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: page.open(s_d)),
                         s_d_l,
                     ]),
                     ft.Row([
-                        ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: s_t.pick_time()),
+                        ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: page.open(s_t)),
                         s_t_l,
                     ]),
                     ft.Text("结束时间", weight=ft.FontWeight.BOLD),
                     ft.Row([
-                        ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: e_d.pick_date()),
+                        ft.ElevatedButton("日期", icon=ft.Icons.CALENDAR_TODAY, on_click=lambda _: page.open(e_d)),
                         e_d_l,
                     ]),
                     ft.Row([
-                        ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: e_t.pick_time()),
+                        ft.ElevatedButton("时间", icon=ft.Icons.ACCESS_TIME, on_click=lambda _: page.open(e_t)),
                         e_t_l,
                     ]),
                     loc,
